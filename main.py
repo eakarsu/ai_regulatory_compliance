@@ -149,6 +149,7 @@ from routers import gap_third_party_audit_tool_integration
 from routers import gap_evidence_collection_request_workflow_reminders
 from routers import gap_outbound_webhooks
 from routers import gap_multi_tenant_separation_primitives_visible
+from routers import control_attestation_queue
 app.include_router(gap_limited_ai_policy_generation_pipeline.router)
 app.include_router(gap_streaming_regulation_change_alerting.router)
 app.include_router(gap_ai_control_mapping_regulation_clause.router)
@@ -159,3 +160,4 @@ app.include_router(gap_third_party_audit_tool_integration.router)
 app.include_router(gap_evidence_collection_request_workflow_reminders.router)
 app.include_router(gap_outbound_webhooks.router)
 app.include_router(gap_multi_tenant_separation_primitives_visible.router)
+app.include_router(control_attestation_queue.router)

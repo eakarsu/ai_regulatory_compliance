@@ -17,6 +17,12 @@ import AIChat from './pages/AIChat';
 import AIBacklogTools from './pages/AIBacklogTools';
 import CalendarPage from './pages/CalendarPage';
 import Profile from './pages/Profile';
+import ControlAttestationQueue from './pages/ControlAttestationQueue';
+
+import CodexCustomVizFeature from './pages/CodexCustomVizFeature';
+import CodexOperationsFeature from './pages/CodexOperationsFeature';
+
+import TimelineView from './pages/TimelineView';
 
 function Protected({ children }: { children: JSX.Element }) {
   const { user, loading } = useAuth();
@@ -30,6 +36,10 @@ export default function App() {
     <>
       <Nav />
       <Routes>
+        <Route path="/insights/timeline" element={<TimelineView />} />
+        <Route path="/codex/custom-viz" element={<CodexCustomVizFeature />} />
+        <Route path="/codex/operations" element={<CodexOperationsFeature />} />
+
         <Route path="/login" element={<Login />} />
         <Route path="/" element={<Protected><Dashboard /></Protected>} />
         <Route path="/regulations" element={<Protected><Regulations /></Protected>} />
@@ -46,6 +56,7 @@ export default function App() {
         <Route path="/ai/backlog-tools" element={<Protected><AIBacklogTools /></Protected>} />
         <Route path="/calendar" element={<Protected><CalendarPage /></Protected>} />
         <Route path="/profile" element={<Protected><Profile /></Protected>} />
+        <Route path="/control-attestation-queue" element={<Protected><ControlAttestationQueue /></Protected>} />
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
     </>
