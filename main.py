@@ -1,163 +1,117 @@
+import json
 import os
-import sys
+import time
+import uuid
+from collections import Counter
 
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import JSONResponse
+from fastapi.responses import PlainTextResponse
 from slowapi import Limiter, _rate_limit_exceeded_handler
-from slowapi.util import get_remote_address
 from slowapi.errors import RateLimitExceeded
+from slowapi.util import get_remote_address
+from sqlalchemy import text
 
-from database import Base, engine, SessionLocal
-import models  # noqa: F401 — register models before create_all
+from database import SessionLocal
 import auth
-from routers import regulations, assessments, alerts, ai, risk_items, evidence, calendar, watches, reports
-from seed_data import seed_regulations
+from routers import governance as governance_router
 from scheduler import start_scheduler, stop_scheduler
 
-# ── Startup guard: refuse to run with default JWT secret ──────────────────────
-JWT_SECRET = os.getenv("JWT_SECRET", "change-me-in-production")
-if JWT_SECRET == "change-me-in-production":
-    print(
-        "[SECURITY WARNING] JWT_SECRET is set to the default insecure value. "
-        "Set the JWT_SECRET environment variable to a strong random secret before deploying.",
-        file=sys.stderr,
-    )
+ENVIRONMENT = os.getenv("ENVIRONMENT", "development")
+AUTH_MODE = os.getenv("AUTH_MODE", "local")
+if ENVIRONMENT == "production":
+    required_oidc = ["OIDC_ISSUER", "OIDC_AUDIENCE", "OIDC_JWKS_URL"]
+    missing = [key for key in required_oidc if not os.getenv(key)]
+    insecure = any(not os.getenv(key, "").startswith("https://") for key in ["OIDC_ISSUER", "OIDC_JWKS_URL"])
+    if AUTH_MODE != "oidc" or missing or insecure:
+        raise RuntimeError(f"Production requires OIDC authentication; missing: {', '.join(missing) or 'AUTH_MODE=oidc'}")
+elif AUTH_MODE == "local" and len(os.getenv("JWT_SECRET", "")) < 32:
+    raise RuntimeError("JWT_SECRET of at least 32 characters is required for local authentication")
 
-# ── Rate limiter ──────────────────────────────────────────────────────────────
 limiter = Limiter(key_func=get_remote_address, default_limits=["200/hour"])
-
-app = FastAPI(
-    title="AI Regulatory Compliance Platform",
-    description=(
-        "Comprehensive AI-powered regulatory compliance monitoring platform. "
-        "Track regulations, run AI-assisted assessments, manage alerts, and generate policies."
-    ),
-    version="2.0.0",
-)
-
-# Expose limiter on app state for slowapi middleware
+app = FastAPI(title="Governed Regulatory Compliance Platform", version="3.0.0")
 app.state.limiter = limiter
 app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
+request_totals: Counter[tuple[str, int]] = Counter()
 
-# ── Security headers middleware ────────────────────────────────────────────────
+
 @app.middleware("http")
-async def add_security_headers(request: Request, call_next):
+async def security_and_observability(request: Request, call_next):
+    request_id = request.headers.get("X-Request-Id", str(uuid.uuid4()))
+    started = time.monotonic()
     response = await call_next(request)
-    response.headers["X-Content-Type-Options"] = "nosniff"
-    response.headers["X-Frame-Options"] = "DENY"
-    response.headers["X-XSS-Protection"] = "1; mode=block"
-    response.headers["Referrer-Policy"] = "strict-origin-when-cross-origin"
-    response.headers["Permissions-Policy"] = "geolocation=(), microphone=(), camera=()"
+    response.headers.update({
+        "X-Request-Id": request_id, "X-Content-Type-Options": "nosniff", "X-Frame-Options": "DENY",
+        "Referrer-Policy": "strict-origin-when-cross-origin", "Permissions-Policy": "geolocation=(), microphone=(), camera=()",
+    })
     if request.url.scheme == "https":
         response.headers["Strict-Transport-Security"] = "max-age=63072000; includeSubDomains; preload"
+    request_totals[(request.method, response.status_code)] += 1
+    print(json.dumps({"level": "info", "event": "http_request", "request_id": request_id, "method": request.method,
+                      "path": request.url.path, "status": response.status_code, "duration_ms": round((time.monotonic() - started) * 1000)}))
     return response
 
-# ── Request logging middleware ────────────────────────────────────────────────
-@app.middleware("http")
-async def log_requests(request: Request, call_next):
-    import time
-    start = time.time()
-    response = await call_next(request)
-    duration_ms = round((time.time() - start) * 1000)
-    print(f"[ACCESS] {request.method} {request.url.path} -> {response.status_code} ({duration_ms}ms)")
-    return response
 
-# ── CORS ──────────────────────────────────────────────────────────────────────
-CLIENT_URL = os.getenv("CLIENT_URL", "http://localhost:5173")
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=[CLIENT_URL, "http://localhost:3000", "http://localhost:5173"],
-    allow_credentials=True,
-    allow_methods=["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
-    allow_headers=["Authorization", "Content-Type", "Accept"],
-)
+client_url = os.getenv("CLIENT_URL", "http://localhost:5173")
+app.add_middleware(CORSMiddleware, allow_origins=[client_url], allow_credentials=True,
+                   allow_methods=["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
+                   allow_headers=["Authorization", "Content-Type", "Accept", "X-Request-Id"])
 
-# ── Routers ───────────────────────────────────────────────────────────────────
 app.include_router(auth.router)
-app.include_router(regulations.router)
-app.include_router(assessments.router)
-app.include_router(alerts.router)
-app.include_router(ai.router)
-app.include_router(risk_items.router)
-app.include_router(evidence.router)
-app.include_router(calendar.router)
-app.include_router(watches.router)
-app.include_router(reports.router)
+app.include_router(governance_router.router)
+
+# Historic CRUD, generic AI, generated gaps, and sample integrations do not have
+# the governed tenant/evidence guarantees. They can only be inspected in a
+# non-production sandbox with explicit operator intent.
+if os.getenv("ENABLE_LEGACY_ROUTES", "false").lower() == "true" and ENVIRONMENT != "production":
+    from routers import regulations, assessments, alerts, ai, risk_items, evidence, calendar, watches, reports
+    from routers import regulation_feed, readiness_simulator, cross_regulation_mapper, evidence_assistant, external_connectors
+    from routers import gap_limited_ai_policy_generation_pipeline, gap_streaming_regulation_change_alerting
+    from routers import gap_ai_control_mapping_regulation_clause, gap_ai_audit_question_rehearsal_interviewer
+    from routers import gap_approval_workflows_policy_sign_offs, gap_external_regulation_data_feeds_sec
+    from routers import gap_third_party_audit_tool_integration, gap_evidence_collection_request_workflow_reminders
+    from routers import gap_outbound_webhooks, gap_multi_tenant_separation_primitives_visible, control_attestation_queue
+    for legacy in [regulations, assessments, alerts, ai, risk_items, evidence, calendar, watches, reports,
+                   regulation_feed, readiness_simulator, cross_regulation_mapper, evidence_assistant, external_connectors,
+                   gap_limited_ai_policy_generation_pipeline, gap_streaming_regulation_change_alerting,
+                   gap_ai_control_mapping_regulation_clause, gap_ai_audit_question_rehearsal_interviewer,
+                   gap_approval_workflows_policy_sign_offs, gap_external_regulation_data_feeds_sec,
+                   gap_third_party_audit_tool_integration, gap_evidence_collection_request_workflow_reminders,
+                   gap_outbound_webhooks, gap_multi_tenant_separation_primitives_visible, control_attestation_queue]:
+        app.include_router(legacy.router)
 
 
 @app.on_event("startup")
 def startup():
-    # Create tables
-    Base.metadata.create_all(bind=engine)
-
-    # Seed sample regulations
-    db = SessionLocal()
-    try:
-        seed_regulations(db)
-    finally:
-        db.close()
-
-    # Start background scheduler
-    start_scheduler()
+    if os.getenv("ENABLE_SCHEDULER", "false").lower() == "true":
+        start_scheduler()
 
 
 @app.on_event("shutdown")
 def shutdown():
-    stop_scheduler()
+    if os.getenv("ENABLE_SCHEDULER", "false").lower() == "true":
+        stop_scheduler()
 
 
 @app.get("/health", tags=["health"])
 def health():
-    """Health check with database connectivity verification."""
-    from sqlalchemy import text
+    return {"status": "healthy", "service": "regulatory-compliance-platform", "version": "3.0.0"}
+
+
+@app.get("/ready", tags=["health"])
+def ready():
     db = SessionLocal()
     try:
         db.execute(text("SELECT 1"))
-        db_status = "ok"
-    except Exception as e:
-        db_status = f"error: {str(e)}"
+        return {"status": "ready", "database": "ok"}
+    except Exception:
+        from fastapi import HTTPException
+        raise HTTPException(status_code=503, detail="database unavailable")
     finally:
         db.close()
 
-    return {
-        "status": "ok" if db_status == "ok" else "degraded",
-        "service": "regulatory-compliance-platform",
-        "version": "2.0.0",
-        "database": db_status,
-    }
 
-# BATCH_00_AUDIT_MOUNTS
-from routers import regulation_feed as regulation_feed_router  # noqa
-app.include_router(regulation_feed_router.router)
-from routers import readiness_simulator as readiness_simulator_router  # noqa
-app.include_router(readiness_simulator_router.router)
-from routers import cross_regulation_mapper as cross_regulation_mapper_router  # noqa
-app.include_router(cross_regulation_mapper_router.router)
-from routers import evidence_assistant as evidence_assistant_router  # noqa
-app.include_router(evidence_assistant_router.router)
-from routers import external_connectors as external_connectors_router  # noqa
-app.include_router(external_connectors_router.router)
-# === Batch 00 Gaps & Frontend Mounts ===
-from routers import gap_limited_ai_policy_generation_pipeline
-from routers import gap_streaming_regulation_change_alerting
-from routers import gap_ai_control_mapping_regulation_clause
-from routers import gap_ai_audit_question_rehearsal_interviewer
-from routers import gap_approval_workflows_policy_sign_offs
-from routers import gap_external_regulation_data_feeds_sec
-from routers import gap_third_party_audit_tool_integration
-from routers import gap_evidence_collection_request_workflow_reminders
-from routers import gap_outbound_webhooks
-from routers import gap_multi_tenant_separation_primitives_visible
-from routers import control_attestation_queue
-app.include_router(gap_limited_ai_policy_generation_pipeline.router)
-app.include_router(gap_streaming_regulation_change_alerting.router)
-app.include_router(gap_ai_control_mapping_regulation_clause.router)
-app.include_router(gap_ai_audit_question_rehearsal_interviewer.router)
-app.include_router(gap_approval_workflows_policy_sign_offs.router)
-app.include_router(gap_external_regulation_data_feeds_sec.router)
-app.include_router(gap_third_party_audit_tool_integration.router)
-app.include_router(gap_evidence_collection_request_workflow_reminders.router)
-app.include_router(gap_outbound_webhooks.router)
-app.include_router(gap_multi_tenant_separation_primitives_visible.router)
-app.include_router(control_attestation_queue.router)
+@app.get("/metrics", response_class=PlainTextResponse, tags=["health"])
+def metrics():
+    lines = [f'http_requests_total{{method="{method}",status="{status}"}} {count}' for (method, status), count in sorted(request_totals.items())]
+    return "\n".join(lines) + "\n"

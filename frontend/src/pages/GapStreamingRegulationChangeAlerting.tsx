@@ -24,7 +24,7 @@ export default function StreamingRegulationChangeAlertingPage() {
       }
   ];
 
-  const applySampleRequest = (value) => {
+  const applySampleRequest = (value: string) => {
     setInput(value);
     setError(null);
     setResult(null);

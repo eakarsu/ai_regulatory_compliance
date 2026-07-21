@@ -20,7 +20,7 @@ export default function Login() {
     try {
       if (mode === 'login') await login(email, password);
       else await register(email, password, name, organization);
-      navigate('/');
+      navigate('/governance');
     } catch (err: any) {
       setError(err.message || 'Failed');
     } finally {

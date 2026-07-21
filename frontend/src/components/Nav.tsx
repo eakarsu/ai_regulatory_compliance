@@ -5,12 +5,13 @@ import { useAuth } from '../context/AuthContext';
 export default function Nav() {
   const { user, logout } = useAuth();
   const [aiOpen, setAiOpen] = useState(false);
+  const legacyUiEnabled = (import.meta as any).env?.VITE_ENABLE_LEGACY_UI === 'true';
 
   if (!user) return null;
   return (
     <div className="nav">
       <span className="nav-brand">RegCompliance AI</span>
-      <NavLink to="/" end className={({ isActive }) => (isActive ? 'active' : '')}>
+      {legacyUiEnabled && <><NavLink to="/dashboard" className={({ isActive }) => (isActive ? 'active' : '')}>
         Dashboard
       </NavLink>
       <NavLink to="/regulations" className={({ isActive }) => (isActive ? 'active' : '')}>
@@ -64,21 +65,16 @@ export default function Nav() {
                 key={item.to}
                 to={item.to}
                 onClick={() => setAiOpen(false)}
-                style={{
-                  display: 'block',
-                  padding: '8px 14px',
-                  color: '#1e293b',
-                  borderRadius: 6,
-                  fontSize: 14,
-                }}
+                style={{ display: 'block', padding: '8px 14px', color: '#1e293b', borderRadius: 6, fontSize: 14 }}
                 className={({ isActive }) => (isActive ? 'active' : '')}
-              >
-                {item.label}
-              </NavLink>
+              >{item.label}</NavLink>
             ))}
           </div>
         )}
-      </div>
+      </div></>}
+      <NavLink to="/governance" className={({ isActive }) => (isActive ? 'active' : '')}>
+        Governed Release
+      </NavLink>
 
       <div style={{ marginLeft: 'auto', display: 'flex', gap: 12, alignItems: 'center' }}>
         <NavLink to="/profile" style={{ color: 'white', fontSize: 13 }}>

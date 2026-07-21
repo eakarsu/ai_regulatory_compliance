@@ -1,0 +1,36 @@
+services:
+  database:
+    image: postgres:16
+    environment:
+      POSTGRES_DB: compliance
+      POSTGRES_USER: compliance
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD}
+    volumes: [compliance_data:/var/lib/postgresql/data]
+    healthcheck: { test: [CMD-SHELL, "pg_isready -U compliance"], interval: 5s, timeout: 5s, retries: 12 }
+  migrate:
+    build: .
+    environment:
+      DATABASE_URL: postgresql://compliance:${POSTGRES_PASSWORD}@database:5432/compliance
+      ALLOW_SCHEMA_MIGRATION: '1'
+    command: ["./start.sh", "migrate"]
+    depends_on: { database: { condition: service_healthy } }
+  backend:
+    build: .
+    environment:
+      DATABASE_URL: postgresql://compliance:${POSTGRES_PASSWORD}@database:5432/compliance
+      ENVIRONMENT: production
+      AUTH_MODE: oidc
+      OIDC_ISSUER: ${OIDC_ISSUER:?set OIDC_ISSUER}
+      OIDC_AUDIENCE: ${OIDC_AUDIENCE:?set OIDC_AUDIENCE}
+      OIDC_JWKS_URL: ${OIDC_JWKS_URL:?set OIDC_JWKS_URL}
+      CLIENT_URL: ${CLIENT_URL:-http://localhost:3000}
+    ports: ["8000:8000"]
+    depends_on: { migrate: { condition: service_completed_successfully } }
+  frontend:
+    build:
+      context: ./frontend
+      args: { VITE_API_BASE: "${VITE_API_BASE:-http://localhost:8000/api}" }
+    ports: ["3000:8080"]
+    depends_on: [backend]
+volumes:
+  compliance_data:

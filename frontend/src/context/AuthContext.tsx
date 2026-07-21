@@ -7,6 +7,7 @@ interface User {
   name: string;
   organization?: string;
   role: string;
+  created_at: string;
 }
 
 interface AuthContextValue {

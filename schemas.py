@@ -1,6 +1,7 @@
 from datetime import date, datetime
 from typing import Any, Dict, List, Optional
-from pydantic import BaseModel, EmailStr, field_validator, model_validator
+from email_validator import EmailNotValidError, validate_email
+from pydantic import BaseModel, field_validator, model_validator
 import re
 
 
@@ -21,16 +22,24 @@ class PaginatedResponse(BaseModel):
 # ── Auth ──────────────────────────────────────────────────────────────────────
 
 class UserCreate(BaseModel):
-    email: EmailStr
+    email: str
     password: str
     name: str
-    organization: Optional[str] = None
+    organization: str
+
+    @field_validator("email")
+    @classmethod
+    def email_syntax(cls, value: str) -> str:
+        try:
+            return validate_email(value, check_deliverability=False, test_environment=True).normalized
+        except EmailNotValidError as error:
+            raise ValueError("A valid email address is required") from error
 
     @field_validator("password")
     @classmethod
     def password_min_length(cls, v: str) -> str:
-        if len(v) < 8:
-            raise ValueError("Password must be at least 8 characters")
+        if len(v) < 12:
+            raise ValueError("Password must be at least 12 characters")
         return v
 
     @field_validator("name")
@@ -42,13 +51,20 @@ class UserCreate(BaseModel):
 
 
 class UserLogin(BaseModel):
-    email: EmailStr
+    email: str
     password: str
+
+    @field_validator("email")
+    @classmethod
+    def email_syntax(cls, value: str) -> str:
+        try:
+            return validate_email(value, check_deliverability=False, test_environment=True).normalized
+        except EmailNotValidError as error:
+            raise ValueError("A valid email address is required") from error
 
 
 class UserUpdate(BaseModel):
     name: Optional[str] = None
-    organization: Optional[str] = None
 
     @field_validator("name")
     @classmethod
@@ -64,6 +80,7 @@ class UserOut(BaseModel):
     name: str
     organization: Optional[str]
     role: str
+    tenant_id: str
     created_at: datetime
 
     model_config = {"from_attributes": True}

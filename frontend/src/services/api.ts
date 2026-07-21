@@ -65,6 +65,22 @@ export const auth = {
   updateMe: (name?: string, organization?: string) =>
     request('/auth/me', { method: 'PUT', body: JSON.stringify({ name, organization }) }),
   logout: () => request('/auth/logout', { method: 'POST' }),
+  users: () => request('/auth/users'),
+  provisionUser: (data: { email: string; name: string; role: string; password?: string }) =>
+    request('/auth/users', { method: 'POST', body: JSON.stringify(data) }),
+};
+
+export const governance = {
+  sources: () => request('/governance/sources'),
+  ingestSource: (data: any) => request('/governance/sources', { method: 'POST', body: JSON.stringify(data) }),
+  policies: () => request('/governance/policies'),
+  policy: (id: string) => request(`/governance/policies/${id}`),
+  createPolicy: (data: any) => request('/governance/policies', { method: 'POST', body: JSON.stringify(data) }),
+  addEvidence: (id: string, data: any) => request(`/governance/policies/${id}/evidence`, { method: 'POST', body: JSON.stringify(data) }),
+  evaluate: (id: string, scenario: string) => request(`/governance/policies/${id}/evaluations`, { method: 'POST', body: JSON.stringify({ scenario }) }),
+  transition: (id: string, target: string, rationale: string) => request(`/governance/policies/${id}/transitions`, { method: 'POST', body: JSON.stringify({ target, rationale }) }),
+  legalHold: (id: string) => request(`/governance/policies/${id}/retention`, { method: 'PATCH', body: JSON.stringify({ legal_hold: true }) }),
+  auditExport: () => request('/governance/audit-export'),
 };
 
 // ── Regulations ──

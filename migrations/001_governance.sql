@@ -1,0 +1,11 @@
+BEGIN;
+CREATE TABLE IF NOT EXISTS regulatory_source_versions(id UUID PRIMARY KEY,tenant_id TEXT NOT NULL,source_uri TEXT NOT NULL,publisher TEXT NOT NULL,jurisdiction TEXT NOT NULL,effective_at TIMESTAMPTZ NOT NULL,retrieved_at TIMESTAMPTZ NOT NULL,source_version TEXT NOT NULL,content_digest TEXT NOT NULL,provenance JSONB NOT NULL,created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),UNIQUE(tenant_id,source_uri,source_version,content_digest));
+CREATE TABLE IF NOT EXISTS governed_policy_versions(id UUID PRIMARY KEY,tenant_id TEXT NOT NULL,policy_key TEXT NOT NULL,version INTEGER NOT NULL,status TEXT NOT NULL DEFAULT 'draft',owner_id TEXT NOT NULL,reviewer_id TEXT,approver_id TEXT,body_digest TEXT NOT NULL,retain_until TIMESTAMPTZ,legal_hold BOOLEAN NOT NULL DEFAULT FALSE,created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),UNIQUE(tenant_id,policy_key,version));
+CREATE TABLE IF NOT EXISTS governed_evidence_links(policy_version_id UUID REFERENCES governed_policy_versions(id),source_version_id UUID REFERENCES regulatory_source_versions(id),locator TEXT NOT NULL,obligation TEXT NOT NULL,owner_id TEXT NOT NULL,deadline TIMESTAMPTZ NOT NULL,risk_rating TEXT NOT NULL CHECK(risk_rating IN('low','medium','high','critical')),PRIMARY KEY(policy_version_id,source_version_id,locator));
+CREATE TABLE IF NOT EXISTS governed_evaluations(id UUID PRIMARY KEY,tenant_id TEXT NOT NULL,policy_version_id UUID REFERENCES governed_policy_versions(id),scenario TEXT NOT NULL,result JSONB NOT NULL,passed BOOLEAN NOT NULL,evaluated_at TIMESTAMPTZ NOT NULL DEFAULT NOW());
+CREATE TABLE IF NOT EXISTS governed_decisions(id BIGSERIAL PRIMARY KEY,tenant_id TEXT NOT NULL,policy_version_id UUID REFERENCES governed_policy_versions(id),from_status TEXT,to_status TEXT NOT NULL,actor_id TEXT NOT NULL,rationale TEXT NOT NULL,snapshot JSONB NOT NULL,occurred_at TIMESTAMPTZ NOT NULL DEFAULT NOW());
+CREATE OR REPLACE FUNCTION immutable_governed_record() RETURNS trigger LANGUAGE plpgsql AS $$BEGIN RAISE EXCEPTION 'governance records are append-only';END$$;
+DROP TRIGGER IF EXISTS governed_decisions_immutable ON governed_decisions;
+CREATE TRIGGER governed_decisions_immutable BEFORE UPDATE OR DELETE ON governed_decisions FOR EACH ROW EXECUTE FUNCTION immutable_governed_record();
+CREATE INDEX IF NOT EXISTS governed_policy_queue ON governed_policy_versions(tenant_id,status,created_at);
+COMMIT;

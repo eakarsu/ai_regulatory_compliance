@@ -18,6 +18,7 @@ import AIBacklogTools from './pages/AIBacklogTools';
 import CalendarPage from './pages/CalendarPage';
 import Profile from './pages/Profile';
 import ControlAttestationQueue from './pages/ControlAttestationQueue';
+import GovernanceWorkflow from './pages/GovernanceWorkflow';
 
 import CodexCustomVizFeature from './pages/CodexCustomVizFeature';
 import CodexOperationsFeature from './pages/CodexOperationsFeature';
@@ -32,31 +33,35 @@ function Protected({ children }: { children: JSX.Element }) {
 }
 
 export default function App() {
+  const legacyUiEnabled = (import.meta as any).env?.VITE_ENABLE_LEGACY_UI === 'true';
   return (
     <>
       <Nav />
       <Routes>
-        <Route path="/insights/timeline" element={<TimelineView />} />
-        <Route path="/codex/custom-viz" element={<CodexCustomVizFeature />} />
-        <Route path="/codex/operations" element={<CodexOperationsFeature />} />
-
         <Route path="/login" element={<Login />} />
-        <Route path="/" element={<Protected><Dashboard /></Protected>} />
-        <Route path="/regulations" element={<Protected><Regulations /></Protected>} />
-        <Route path="/regulations/:id" element={<Protected><RegulationDetail /></Protected>} />
-        <Route path="/assessments" element={<Protected><Assessments /></Protected>} />
-        <Route path="/assessments/:id" element={<Protected><AssessmentDetail /></Protected>} />
-        <Route path="/alerts" element={<Protected><Alerts /></Protected>} />
-        <Route path="/ai/analyze" element={<Protected><AIAnalyzeRegulation /></Protected>} />
-        <Route path="/ai/risk" element={<Protected><AIRiskAssessment /></Protected>} />
-        <Route path="/ai/gap" element={<Protected><AIGapAnalysis /></Protected>} />
-        <Route path="/ai/policy" element={<Protected><AIGeneratePolicy /></Protected>} />
-        <Route path="/ai/history" element={<Protected><AIHistory /></Protected>} />
-        <Route path="/ai/chat" element={<Protected><AIChat /></Protected>} />
-        <Route path="/ai/backlog-tools" element={<Protected><AIBacklogTools /></Protected>} />
-        <Route path="/calendar" element={<Protected><CalendarPage /></Protected>} />
+        <Route path="/" element={<Protected><Navigate to="/governance" replace /></Protected>} />
         <Route path="/profile" element={<Protected><Profile /></Protected>} />
-        <Route path="/control-attestation-queue" element={<Protected><ControlAttestationQueue /></Protected>} />
+        <Route path="/governance" element={<Protected><GovernanceWorkflow /></Protected>} />
+        {legacyUiEnabled && <>
+          <Route path="/insights/timeline" element={<TimelineView />} />
+          <Route path="/codex/custom-viz" element={<CodexCustomVizFeature />} />
+          <Route path="/codex/operations" element={<CodexOperationsFeature />} />
+          <Route path="/dashboard" element={<Protected><Dashboard /></Protected>} />
+          <Route path="/regulations" element={<Protected><Regulations /></Protected>} />
+          <Route path="/regulations/:id" element={<Protected><RegulationDetail /></Protected>} />
+          <Route path="/assessments" element={<Protected><Assessments /></Protected>} />
+          <Route path="/assessments/:id" element={<Protected><AssessmentDetail /></Protected>} />
+          <Route path="/alerts" element={<Protected><Alerts /></Protected>} />
+          <Route path="/ai/analyze" element={<Protected><AIAnalyzeRegulation /></Protected>} />
+          <Route path="/ai/risk" element={<Protected><AIRiskAssessment /></Protected>} />
+          <Route path="/ai/gap" element={<Protected><AIGapAnalysis /></Protected>} />
+          <Route path="/ai/policy" element={<Protected><AIGeneratePolicy /></Protected>} />
+          <Route path="/ai/history" element={<Protected><AIHistory /></Protected>} />
+          <Route path="/ai/chat" element={<Protected><AIChat /></Protected>} />
+          <Route path="/ai/backlog-tools" element={<Protected><AIBacklogTools /></Protected>} />
+          <Route path="/calendar" element={<Protected><CalendarPage /></Protected>} />
+          <Route path="/control-attestation-queue" element={<Protected><ControlAttestationQueue /></Protected>} />
+        </>}
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
     </>

@@ -15,6 +15,14 @@ def gen_uuid():
     return str(uuid.uuid4())
 
 
+class Tenant(Base):
+    __tablename__ = "tenants"
+
+    id = Column(String, primary_key=True)
+    name = Column(String, nullable=False)
+    created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
+
+
 class UserRole(str, enum.Enum):
     admin = "admin"
     analyst = "analyst"
@@ -64,6 +72,9 @@ class User(Base):
     name = Column(String, nullable=False)
     organization = Column(String)
     role = Column(SAEnum(UserRole), default=UserRole.analyst, nullable=False)
+    tenant_id = Column(String, ForeignKey("tenants.id", ondelete="RESTRICT"), nullable=False, index=True)
+    oidc_subject = Column(String, unique=True)
+    is_active = Column(Boolean, default=True, nullable=False)
     created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
 
     assessments = relationship("ComplianceAssessment", back_populates="user", cascade="all, delete-orphan")
