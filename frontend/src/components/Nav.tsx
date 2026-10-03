@@ -1,89 +1,52 @@
 import { useState } from 'react';
 import { NavLink } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
+import './AppSidebar.css';
+
+const WORKSPACE = [
+  { to: '/governance', label: 'Governed Release' },
+  { to: '/profile', label: 'Profile' },
+];
+const LEGACY = [
+  { to: '/dashboard', label: 'Dashboard' },
+  { to: '/regulations', label: 'Regulations' },
+  { to: '/assessments', label: 'Assessments' },
+  { to: '/alerts', label: 'Alerts' },
+  { to: '/calendar', label: 'Calendar' },
+  { to: '/control-attestation-queue', label: 'Control Attestation' },
+];
+const AI_TOOLS = [
+  { to: '/ai/chat', label: 'Chat Assistant' },
+  { to: '/ai/analyze', label: 'Analyze Regulation' },
+  { to: '/ai/risk', label: 'Risk Assessment' },
+  { to: '/ai/gap', label: 'Gap Analysis' },
+  { to: '/ai/policy', label: 'Generate Policy' },
+  { to: '/ai/backlog-tools', label: 'Backlog Tools' },
+  { to: '/ai/history', label: 'AI History' },
+];
 
 export default function Nav() {
   const { user, logout } = useAuth();
-  const [aiOpen, setAiOpen] = useState(false);
+  const [query, setQuery] = useState('');
   const legacyUiEnabled = (import.meta as any).env?.VITE_ENABLE_LEGACY_UI === 'true';
-
   if (!user) return null;
-  return (
-    <div className="nav">
-      <span className="nav-brand">RegCompliance AI</span>
-      {legacyUiEnabled && <><NavLink to="/dashboard" className={({ isActive }) => (isActive ? 'active' : '')}>
-        Dashboard
-      </NavLink>
-      <NavLink to="/regulations" className={({ isActive }) => (isActive ? 'active' : '')}>
-        Regulations
-      </NavLink>
-      <NavLink to="/assessments" className={({ isActive }) => (isActive ? 'active' : '')}>
-        Assessments
-      </NavLink>
-      <NavLink to="/alerts" className={({ isActive }) => (isActive ? 'active' : '')}>
-        Alerts
-      </NavLink>
-      <NavLink to="/calendar" className={({ isActive }) => (isActive ? 'active' : '')}>
-        Calendar
-      </NavLink>
-
-      {/* AI dropdown */}
-      <div style={{ position: 'relative' }}>
-        <button
-          className="secondary"
-          style={{ fontSize: 14, padding: '6px 12px' }}
-          onClick={() => setAiOpen(o => !o)}
-        >
-          AI Tools ▾
-        </button>
-        {aiOpen && (
-          <div
-            style={{
-              position: 'absolute',
-              top: '100%',
-              left: 0,
-              background: 'white',
-              border: '1px solid #e2e8f0',
-              borderRadius: 8,
-              boxShadow: '0 4px 12px rgba(0,0,0,0.1)',
-              minWidth: 180,
-              zIndex: 100,
-              padding: 4,
-            }}
-            onMouseLeave={() => setAiOpen(false)}
-          >
-            {[
-              { to: '/ai/chat', label: 'Chat Assistant' },
-              { to: '/ai/analyze', label: 'Analyze Regulation' },
-              { to: '/ai/risk', label: 'Risk Assessment' },
-              { to: '/ai/gap', label: 'Gap Analysis' },
-              { to: '/ai/policy', label: 'Generate Policy' },
-              { to: '/ai/backlog-tools', label: 'Backlog Tools' },
-              { to: '/ai/history', label: 'AI History' },
-            ].map(item => (
-              <NavLink
-                key={item.to}
-                to={item.to}
-                onClick={() => setAiOpen(false)}
-                style={{ display: 'block', padding: '8px 14px', color: '#1e293b', borderRadius: 6, fontSize: 14 }}
-                className={({ isActive }) => (isActive ? 'active' : '')}
-              >{item.label}</NavLink>
-            ))}
-          </div>
-        )}
-      </div></>}
-      <NavLink to="/governance" className={({ isActive }) => (isActive ? 'active' : '')}>
-        Governed Release
-      </NavLink>
-
-      <div style={{ marginLeft: 'auto', display: 'flex', gap: 12, alignItems: 'center' }}>
-        <NavLink to="/profile" style={{ color: 'white', fontSize: 13 }}>
-          {user.name}
-        </NavLink>
-        <button className="secondary" onClick={logout} style={{ fontSize: 13, padding: '6px 12px' }}>
-          Logout
-        </button>
-      </div>
-    </div>
-  );
+  const groups = [
+    { label: 'Workspace', items: legacyUiEnabled ? [...WORKSPACE, ...LEGACY] : WORKSPACE },
+    ...(legacyUiEnabled ? [{ label: 'AI tools', items: AI_TOOLS }] : []),
+  ];
+  return <aside className="codex-side" aria-label="Application navigation">
+    <div className="codex-side-brand"><strong>RegCompliance AI</strong><span>{user.name}</span></div>
+    <label className="codex-side-search-label" htmlFor="codex-side-search">Find a section</label>
+    <input id="codex-side-search" className="codex-side-search" type="search" value={query} onChange={event => setQuery(event.target.value)} placeholder="Search navigation" />
+    <nav className="codex-side-links" aria-label="Sections">
+      {groups.map(group => {
+        const items = group.items.filter(item => item.label.toLowerCase().includes(query.toLowerCase().trim()));
+        return items.length ? <div className="codex-side-group" key={group.label}>
+          <span className="codex-side-heading">{group.label}</span>
+          {items.map(item => <NavLink key={item.to} to={item.to} className={({ isActive }) => `codex-side-link${isActive ? ' active' : ''}`}>{item.label}</NavLink>)}
+        </div> : null;
+      })}
+    </nav>
+    <button className="codex-side-logout" type="button" onClick={logout}>Sign out</button>
+  </aside>;
 }
