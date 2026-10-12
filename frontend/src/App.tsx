@@ -1,3 +1,4 @@
+import AIReportLibrary from "./components/AIReportLibrary";
 import { Routes, Route, Navigate } from 'react-router-dom';
 import { useAuth } from './context/AuthContext';
 import Nav from './components/Nav';
@@ -36,7 +37,7 @@ export default function App() {
   const { user } = useAuth();
   const legacyUiEnabled = (import.meta as any).env?.VITE_ENABLE_LEGACY_UI === 'true';
   return (
-    <div className={user ? 'codex-nav-shell' : undefined}>
+    <><AIReportLibrary floating /><div className={user ? 'codex-nav-shell' : undefined}>
       <Nav />
       <Routes>
         <Route path="/login" element={<Login />} />
@@ -65,6 +66,6 @@ export default function App() {
         </>}
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
-    </div>
+    </div></>
   );
 }

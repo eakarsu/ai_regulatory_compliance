@@ -1,5 +1,22 @@
 import { useEffect, useRef, useState } from 'react';
+import AIReport from '../components/AIReport';
+import NativeAIPresets from '../components/NativeAIPresets';
 import { ai, assessments, regulations } from '../services/api';
+
+const chatExamples = [
+  {
+    label: 'Control priorities',
+    prompt: 'Using the selected regulation and assessment, identify the three highest-priority compliance control improvements. Separate known evidence from assumptions and include owners, target dates, and approval checkpoints.',
+  },
+  {
+    label: 'Audit preparation',
+    prompt: 'Prepare an audit-readiness briefing for the selected regulation and assessment. List likely auditor questions, supporting evidence to gather, unresolved gaps, and a one-week preparation plan.',
+  },
+  {
+    label: 'Executive briefing',
+    prompt: 'Create an executive compliance briefing for the selected regulation and assessment. Summarize current posture, material risks, decisions needed, and the next 30 days of work without inventing evidence.',
+  },
+];
 
 function generateSessionId() {
   return `session-${Date.now()}-${Math.random().toString(36).slice(2)}`;
@@ -65,6 +82,19 @@ export default function AIChat() {
       </p>
 
       <div className="card" style={{ marginBottom: 12 }}>
+        <NativeAIPresets
+          presets={chatExamples.map((example, index) => ({
+            label: example.label,
+            apply: () => {
+              setInput(example.prompt);
+              setContextRegId(String(regulationsList[index % regulationsList.length].id));
+              setContextAssId(String(assessmentsList[index % assessmentsList.length].id));
+              setError('');
+            },
+          }))}
+          disabled={busy || regulationsList.length === 0 || assessmentsList.length === 0}
+          note={regulationsList.length && assessmentsList.length ? 'Each example fills the prompt and both optional context selectors with existing records.' : 'Examples become available after existing regulations and assessments load.'}
+        />
         <div className="grid grid-2">
           <div className="col">
             <label className="label">Context Regulation (optional)</label>
@@ -126,7 +156,9 @@ export default function AIChat() {
                 whiteSpace: 'pre-wrap',
               }}
             >
-              {msg.content}
+              {msg.role === 'assistant'
+                ? <AIReport response={msg.content} title="Assistant response" />
+                : msg.content}
             </div>
           </div>
         ))}

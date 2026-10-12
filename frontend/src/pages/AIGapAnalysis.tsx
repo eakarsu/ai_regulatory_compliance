@@ -1,5 +1,13 @@
 import { useEffect, useState } from 'react';
+import AIReport from '../components/AIReport';
+import NativeAIPresets from '../components/NativeAIPresets';
 import { ai, regulations } from '../services/api';
+
+const controlExamples = [
+  { label: 'Security baseline', controls: 'AES-256 encryption for stored regulated data\nMulti-factor authentication for privileged accounts\nQuarterly user-access certification\nAnnual incident-response tabletop exercise' },
+  { label: 'Privacy program', controls: 'Documented records of processing activities\nData-subject request intake and identity verification\nRetention schedule with quarterly deletion review\nVendor data-processing agreements reviewed annually' },
+  { label: 'Audit readiness', controls: 'Control owners attest quarterly\nEvidence is retained in an immutable audit repository\nExceptions require risk-owner approval and an expiry date\nInternal audit tests critical controls annually' },
+];
 
 export default function AIGapAnalysis() {
   const [regs, setRegs] = useState<any[]>([]);
@@ -37,6 +45,19 @@ export default function AIGapAnalysis() {
       </p>
       <div className="card">
         <form onSubmit={submit} className="col">
+          <NativeAIPresets
+            presets={controlExamples.map((example, index) => ({
+              label: example.label,
+              apply: () => {
+                setRegulationId(String(regs[index % regs.length].id));
+                setControlsText(example.controls);
+                setResult(null);
+                setError('');
+              },
+            }))}
+            disabled={busy || regs.length === 0}
+            note={regs.length ? 'Each example uses an existing regulation and fills the controls field.' : 'Examples become available after existing regulations load.'}
+          />
           <label className="label">Regulation</label>
           <select value={regulationId} onChange={(e) => setRegulationId(e.target.value)} required>
             <option value="">Select regulation...</option>
@@ -60,90 +81,7 @@ export default function AIGapAnalysis() {
         </form>
       </div>
 
-      {result && (
-        <div className="card">
-          <h2 className="h2">Gap Analysis Result</h2>
-          <div className="row">
-            <span className="badge badge-info">Gap Score: {result.gap_score}/100</span>
-          </div>
-          {result.overall_gap_summary && <p style={{ marginTop: 12 }}>{result.overall_gap_summary}</p>}
-          {result.covered_requirements && (
-            <>
-              <h3 className="h3">Covered Requirements</h3>
-              <ul>
-                {result.covered_requirements.map((s: string, i: number) => (
-                  <li key={i}>{s}</li>
-                ))}
-              </ul>
-            </>
-          )}
-          {result.gaps && (
-            <>
-              <h3 className="h3">Gaps</h3>
-              <table>
-                <thead>
-                  <tr>
-                    <th>Requirement</th>
-                    <th>Severity</th>
-                    <th>Remediation</th>
-                    <th>Effort (days)</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {result.gaps.map((g: any, i: number) => (
-                    <tr key={i}>
-                      <td>
-                        <strong>{g.requirement}</strong>
-                        <br />
-                        <span style={{ fontSize: 12, color: '#64748b' }}>{g.gap_description}</span>
-                      </td>
-                      <td>
-                        <span
-                          className={`badge badge-${
-                            g.severity === 'critical' ? 'critical' :
-                            g.severity === 'high' ? 'danger' :
-                            g.severity === 'medium' ? 'warn' : 'gray'
-                          }`}
-                        >
-                          {g.severity}
-                        </span>
-                      </td>
-                      <td style={{ fontSize: 13 }}>{g.remediation}</td>
-                      <td>{g.estimated_effort_days}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </>
-          )}
-          {result.partial_coverage && result.partial_coverage.length > 0 && (
-            <>
-              <h3 className="h3">Partial Coverage</h3>
-              <ul>
-                {result.partial_coverage.map((p: any, i: number) => (
-                  <li key={i}>
-                    <strong>{p.requirement}:</strong> missing {p.what_is_missing}
-                  </li>
-                ))}
-              </ul>
-            </>
-          )}
-          {result.prioritized_remediation_plan && (
-            <>
-              <h3 className="h3">Prioritized Remediation Plan</h3>
-              <ol>
-                {result.prioritized_remediation_plan.map((s: string, i: number) => (
-                  <li key={i}>{s}</li>
-                ))}
-              </ol>
-            </>
-          )}
-          <details style={{ marginTop: 16 }}>
-            <summary>Raw JSON</summary>
-            <div className="code">{JSON.stringify(result, null, 2)}</div>
-          </details>
-        </div>
-      )}
+      <AIReport response={result} title="Gap analysis result" />
     </div>
   );
 }

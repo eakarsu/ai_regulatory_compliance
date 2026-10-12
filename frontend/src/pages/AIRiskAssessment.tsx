@@ -1,5 +1,28 @@
 import { useState } from 'react';
+import AIReport from '../components/AIReport';
+import NativeAIPresets from '../components/NativeAIPresets';
 import { ai } from '../services/api';
+
+const examples = [
+  {
+    label: 'Healthcare SaaS',
+    organizationType: 'Private mid-market company processing patient support data',
+    industry: 'Healthcare software as a service',
+    practices: 'Encryption at rest and in transit\nQuarterly privileged-access reviews\nAnnual HIPAA workforce training\nDocumented incident-response exercises',
+  },
+  {
+    label: 'Public fintech',
+    organizationType: 'Public company with regulated payment operations',
+    industry: 'Financial technology and payment processing',
+    practices: 'Multi-factor authentication for all administrators\nPCI DSS quarterly vulnerability scans\nSOX change approvals retained for seven years\nAnnual vendor due-diligence reviews',
+  },
+  {
+    label: 'EU marketplace',
+    organizationType: 'Private small business serving consumers in the European Union',
+    industry: 'E-commerce marketplace',
+    practices: 'Data processing inventory reviewed semiannually\nConsent and deletion-request workflow\nMonthly cloud access review\nSupplier privacy clauses and breach notification terms',
+  },
+];
 
 export default function AIRiskAssessment() {
   const [orgType, setOrgType] = useState('');
@@ -33,6 +56,19 @@ export default function AIRiskAssessment() {
       </p>
       <div className="card">
         <form onSubmit={submit} className="col">
+          <NativeAIPresets
+            presets={examples.map((example) => ({
+              label: example.label,
+              apply: () => {
+                setOrgType(example.organizationType);
+                setIndustry(example.industry);
+                setPracticesText(example.practices);
+                setResult(null);
+                setError('');
+              },
+            }))}
+            disabled={busy}
+          />
           <div className="grid grid-2">
             <div className="col">
               <label className="label">Organization Type</label>
@@ -67,110 +103,7 @@ export default function AIRiskAssessment() {
         </form>
       </div>
 
-      {result && (
-        <div className="card">
-          <h2 className="h2">Risk Assessment Result</h2>
-          <div className="row">
-            <span className="badge badge-info">Score: {result.overall_risk_score}/100</span>
-            <span
-              className={`badge badge-${
-                result.risk_level === 'critical' ? 'critical' :
-                result.risk_level === 'high' ? 'danger' :
-                result.risk_level === 'medium' ? 'warn' : 'gray'
-              }`}
-            >
-              {result.risk_level} risk
-            </span>
-            {result.estimated_compliance_cost && (
-              <span className="badge badge-gray">Est. cost: {result.estimated_compliance_cost}</span>
-            )}
-          </div>
-          {result.applicable_regulations && (
-            <>
-              <h3 className="h3">Applicable Regulations</h3>
-              <ul>
-                {result.applicable_regulations.map((r: string, i: number) => (
-                  <li key={i}>{r}</li>
-                ))}
-              </ul>
-            </>
-          )}
-          {result.compliance_gaps && (
-            <>
-              <h3 className="h3">Compliance Gaps</h3>
-              <ul>
-                {result.compliance_gaps.map((g: any, i: number) => (
-                  <li key={i} style={{ marginBottom: 6 }}>
-                    <span className={`badge badge-${g.priority === 'high' ? 'danger' : g.priority === 'medium' ? 'warn' : 'gray'}`}>
-                      {g.priority}
-                    </span>{' '}
-                    <strong>{g.gap}</strong> ({g.regulation}) — {g.impact}
-                  </li>
-                ))}
-              </ul>
-            </>
-          )}
-          {result.immediate_actions && (
-            <>
-              <h3 className="h3">Immediate Actions</h3>
-              <ol>
-                {result.immediate_actions.map((s: string, i: number) => (
-                  <li key={i}>{s}</li>
-                ))}
-              </ol>
-            </>
-          )}
-          {result.medium_term_roadmap && (
-            <>
-              <h3 className="h3">Medium-Term Roadmap (3-6 mo)</h3>
-              <ol>
-                {result.medium_term_roadmap.map((s: string, i: number) => (
-                  <li key={i}>{s}</li>
-                ))}
-              </ol>
-            </>
-          )}
-          {result.top_risks && (
-            <>
-              <h3 className="h3">Top Risks</h3>
-              <table>
-                <thead>
-                  <tr>
-                    <th>Risk</th>
-                    <th>Likelihood</th>
-                    <th>Impact</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {result.top_risks.map((r: any, i: number) => (
-                    <tr key={i}>
-                      <td>{r.risk}</td>
-                      <td>
-                        <span
-                          className={`badge badge-${r.likelihood === 'high' ? 'danger' : r.likelihood === 'medium' ? 'warn' : 'gray'}`}
-                        >
-                          {r.likelihood}
-                        </span>
-                      </td>
-                      <td>
-                        <span
-                          className={`badge badge-${r.impact === 'high' ? 'danger' : r.impact === 'medium' ? 'warn' : 'gray'}`}
-                        >
-                          {r.impact}
-                        </span>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </>
-          )}
-          <details style={{ marginTop: 16 }}>
-            <summary>Raw JSON</summary>
-            <div className="code">{JSON.stringify(result, null, 2)}</div>
-          </details>
-        </div>
-      )}
+      <AIReport response={result} title="Risk assessment result" />
     </div>
   );
 }

@@ -1,8 +1,12 @@
+import { useRef as useDemoLoginRef, useState as useDemoLoginState } from 'react';
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 
 export default function Login() {
+  const demoLoginLock = useDemoLoginRef(false);
+  const [demoLoginBusy, setDemoLoginBusy] = useDemoLoginState(false);
+
   const { login, register } = useAuth();
   const navigate = useNavigate();
   const [mode, setMode] = useState<'login' | 'register'>('login');
@@ -13,12 +17,12 @@ export default function Login() {
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
 
-  const submit = async (e: React.FormEvent) => {
+  const submit = async (e: React.FormEvent, demoLoginCredentials: { email: string; password: string } | undefined = undefined) => {
     e.preventDefault();
     setError('');
     setLoading(true);
     try {
-      if (mode === 'login') await login(email, password);
+      if ((demoLoginCredentials || mode === 'login')) await login((demoLoginCredentials?.email ?? email), (demoLoginCredentials?.password ?? password));
       else await register(email, password, name, organization);
       navigate('/governance');
     } catch (err: any) {
@@ -56,12 +60,22 @@ export default function Login() {
           {error && <div className="error">{error}</div>}
           <button
             type="button"
-            onClick={() => { setEmail(import.meta.env.VITE_DEMO_EMAIL || ''); setPassword(import.meta.env.VITE_DEMO_PASSWORD || ''); }}
-            disabled={!import.meta.env.VITE_DEMO_EMAIL || !import.meta.env.VITE_DEMO_PASSWORD}
-            aria-label="Auto Fill Demo Credentials"
+            onClick={async (event) => {
+ if (demoLoginLock.current) return;
+ demoLoginLock.current = true; setDemoLoginBusy(true);
+ const values: {email?: string; password?: string; error?: unknown} = {};
+ const captureDemoValue = (key: "email" | "password" | "error", value: any) => { values[key] = value; return value; };
+ try {
+  await (async () => { setEmail(captureDemoValue("email", import.meta.env.VITE_DEMO_EMAIL || '')); setPassword(captureDemoValue("password", import.meta.env.VITE_DEMO_PASSWORD || '')); })();
+  if (values.error || typeof values.email !== 'string' || !values.email || typeof values.password !== 'string' || !values.password) { setError(typeof values.error === 'string' ? values.error : 'Demo credentials are unavailable.'); return; }
+  await submit(event, { email: values.email, password: values.password });
+ } finally { demoLoginLock.current = false; setDemoLoginBusy(false); }
+}}
+            disabled={demoLoginBusy || (!import.meta.env.VITE_DEMO_EMAIL || !import.meta.env.VITE_DEMO_PASSWORD)}
+            aria-label="Log In as Demo"
             style={{ width: '100%', marginBottom: '12px', padding: '10px 14px', borderRadius: '8px', border: '1px solid currentColor', background: 'transparent', cursor: 'pointer' }}
           >
-            Auto Fill Demo Credentials
+            Log In as Demo
           </button>
           <button type="submit" disabled={loading}>
             {loading ? '...' : mode === 'login' ? 'Sign In' : 'Register'}

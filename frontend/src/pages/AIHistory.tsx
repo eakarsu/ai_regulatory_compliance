@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import AIReport from '../components/AIReport';
 import { ai } from '../services/api';
 
 export default function AIHistory() {
@@ -70,16 +71,11 @@ export default function AIHistory() {
             </div>
             {expanded === log.id && log.result && (
               <div style={{ marginTop: 12 }}>
-                {log.result.summary && (
-                  <p style={{ marginBottom: 8 }}><strong>Summary:</strong> {log.result.summary}</p>
-                )}
-                {log.result.headline && (
-                  <p style={{ marginBottom: 8 }}><strong>Headline:</strong> {log.result.headline}</p>
-                )}
-                <details>
-                  <summary style={{ cursor: 'pointer', fontSize: 13 }}>Full JSON</summary>
-                  <div className="code" style={{ marginTop: 8 }}>{JSON.stringify(log.result, null, 2)}</div>
-                </details>
+                <AIReport
+                  response={log.result}
+                  title={`${typeLabel(log.analysis_type)} saved result`}
+                  tokens={log.tokens_used}
+                />
               </div>
             )}
           </div>

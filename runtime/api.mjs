@@ -1,3 +1,5 @@
+import { readFileSync as readReportFeatures } from 'node:fs';
+import { createRuntimeReportWorkspace } from './reportWorkspace.mjs';
 import http from 'node:http';
 import crypto from 'node:crypto';
 import { literal, query } from './db.mjs';
@@ -13,10 +15,12 @@ const readBody=req=>new Promise((resolve,reject)=>{let text='';req.on('data',chu
 const sha=value=>crypto.createHash('sha256').update(value).digest('hex');
 function verify(password,stored){const [kind,salt,digest]=String(stored).split('$');if(kind!=='scrypt'||!salt||!digest)return false;const candidate=crypto.scryptSync(password,salt,32);const expected=Buffer.from(digest,'hex');return candidate.length===expected.length&&crypto.timingSafeEqual(candidate,expected);}
 function actor(req){const token=String(req.headers.authorization||'').replace(/^Bearer\s+/i,'');if(!token)return null;const row=query(`SELECT u.id,u.email,u.display_name,u.role FROM runtime_app_sessions s JOIN runtime_app_users u ON u.id=s.user_id WHERE s.token_hash=${literal(sha(token))} AND s.expires_at>NOW() AND u.active=TRUE LIMIT 1`,{rows:true});if(!row)return null;const [id,email,displayName,role]=row.split('\t');return{id,email,displayName,role};}
+const reportWorkspace=createRuntimeReportWorkspace({actor,query,literal,json,readBody,features:JSON.parse(readReportFeatures(new URL('./aiWorkspaceFeatures.json',import.meta.url),'utf8'))});
 const server=http.createServer(async(req,res)=>{
-  if(req.method==='OPTIONS'){res.writeHead(204,{'Access-Control-Allow-Origin':frontendOrigin,'Access-Control-Allow-Headers':'Authorization, Content-Type','Access-Control-Allow-Methods':'GET,POST,OPTIONS'});return res.end();}
+  if(req.method==='OPTIONS'){res.writeHead(204,{'Access-Control-Allow-Origin':frontendOrigin,'Access-Control-Allow-Headers':'Authorization, Content-Type','Access-Control-Allow-Methods':'GET,POST,DELETE,OPTIONS'});return res.end();}
   const url=new URL(req.url||'/',`http://127.0.0.1:${port}`);
   try{
+    if(await reportWorkspace(req,res,url))return;
     if(req.method==='GET'&&url.pathname==='/api/health')return json(res,200,{status:'ok',project});
     if(req.method==='POST'&&url.pathname==='/api/auth/login'){
       const body=await readBody(req);const email=String(body.email||'').trim().toLowerCase();const password=String(body.password||'');

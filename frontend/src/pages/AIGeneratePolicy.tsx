@@ -1,5 +1,25 @@
 import { useEffect, useState } from 'react';
+import AIReport from '../components/AIReport';
+import NativeAIPresets from '../components/NativeAIPresets';
 import { ai, regulations } from '../services/api';
+
+const policyExamples = [
+  {
+    label: 'Healthcare policy',
+    organizationName: 'Northstar Health Services',
+    context: 'A 450-person healthcare software company operating in the United States and European Union. The policy applies to employees, contractors, cloud systems, and subprocessors handling patient or customer data.',
+  },
+  {
+    label: 'Fintech policy',
+    organizationName: 'Ledgerline Payments',
+    context: 'A public payment processor with PCI DSS and SOX obligations. The company uses cloud infrastructure, outsourced customer support, and a formal three-lines-of-defense governance model.',
+  },
+  {
+    label: 'Marketplace policy',
+    organizationName: 'Harbor Market Europe',
+    context: 'A 90-person online marketplace serving EU consumers. The policy must address privacy, supplier oversight, incident escalation, annual training, evidence retention, and executive approval.',
+  },
+];
 
 export default function AIGeneratePolicy() {
   const [regs, setRegs] = useState<any[]>([]);
@@ -48,6 +68,20 @@ export default function AIGeneratePolicy() {
       </p>
       <div className="card">
         <form onSubmit={submit} className="col">
+          <NativeAIPresets
+            presets={policyExamples.map((example, index) => ({
+              label: example.label,
+              apply: () => {
+                setRegulationId(String(regs[index % regs.length].id));
+                setOrgName(example.organizationName);
+                setOrgContext(example.context);
+                setResult(null);
+                setError('');
+              },
+            }))}
+            disabled={busy || regs.length === 0}
+            note={regs.length ? 'Each example uses an existing regulation and fills the required and optional policy fields.' : 'Examples become available after existing regulations load.'}
+          />
           <label className="label">Regulation</label>
           <select value={regulationId} onChange={(e) => setRegulationId(e.target.value)} required>
             <option value="">Select regulation...</option>
@@ -73,68 +107,12 @@ export default function AIGeneratePolicy() {
       </div>
 
       {result && (
-        <div className="card">
-          <div className="row" style={{ justifyContent: 'space-between' }}>
-            <h2 className="h2">{result.policy_title}</h2>
-            <button onClick={downloadJSON}>Download JSON</button>
+        <>
+          <div className="row" style={{ justifyContent: 'flex-end', marginBottom: 12 }}>
+            <button type="button" onClick={downloadJSON}>Download JSON</button>
           </div>
-          <div className="row">
-            {result.version && <span className="badge badge-gray">v{result.version}</span>}
-            {result.effective_date && <span className="badge badge-info">Effective: {result.effective_date}</span>}
-          </div>
-          {result.scope && (
-            <>
-              <h3 className="h3">Scope</h3>
-              <p>{result.scope}</p>
-            </>
-          )}
-          {result.purpose && (
-            <>
-              <h3 className="h3">Purpose</h3>
-              <p>{result.purpose}</p>
-            </>
-          )}
-          {result.policy_sections && (
-            <>
-              <h3 className="h3">Policy Sections</h3>
-              {result.policy_sections.map((s: any, i: number) => (
-                <div key={i} style={{ marginBottom: 16, padding: 12, background: '#f8fafc', borderRadius: 6 }}>
-                  <strong>
-                    {s.section_number}. {s.title}
-                  </strong>
-                  <p style={{ marginTop: 6 }}>{s.content}</p>
-                </div>
-              ))}
-            </>
-          )}
-          {result.roles_and_responsibilities && (
-            <>
-              <h3 className="h3">Roles and Responsibilities</h3>
-              {result.roles_and_responsibilities.map((r: any, i: number) => (
-                <div key={i}>
-                  <strong>{r.role}:</strong>
-                  <ul>
-                    {(r.responsibilities || []).map((rs: string, j: number) => (
-                      <li key={j}>{rs}</li>
-                    ))}
-                  </ul>
-                </div>
-              ))}
-            </>
-          )}
-          {result.enforcement && (
-            <>
-              <h3 className="h3">Enforcement</h3>
-              <p>{result.enforcement}</p>
-            </>
-          )}
-          {result.review_cycle && (
-            <p style={{ marginTop: 12, color: '#64748b', fontSize: 13 }}>
-              <strong>Review cycle:</strong> {result.review_cycle}
-              {result.document_owner && ` · Owner: ${result.document_owner}`}
-            </p>
-          )}
-        </div>
+          <AIReport response={result} title={result.policy_title || 'Generated policy'} />
+        </>
       )}
     </div>
   );

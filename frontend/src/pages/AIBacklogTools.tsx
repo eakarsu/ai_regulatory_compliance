@@ -1,13 +1,38 @@
-import { useState } from 'react';
-import { ai } from '../services/api';
+import { useEffect, useState } from 'react';
+import AIReport from '../components/AIReport';
+import NativeAIPresets, { type NativePreset } from '../components/NativeAIPresets';
+import { ai, regulations } from '../services/api';
 
 type ToolKey = 'cross-mapper' | 'readiness' | 'evidence' | 'sec-edgar';
+
+const readinessExamples = [
+  { label: 'External audit', scenario: 'Surprise external audit scheduled for the next quarter', event: 'Regulatory inspection and evidence sampling', controls: 'Quarterly control-owner attestations\nCentral evidence repository\nAnnual internal audit testing\nDocumented exception approvals' },
+  { label: 'Acquisition review', scenario: 'Compliance readiness review before acquiring a regulated software vendor', event: 'Pre-close due-diligence committee review', controls: 'Vendor risk tiering\nSecurity questionnaire and evidence review\nContractual audit rights\nRemediation tracking with accountable owners' },
+  { label: 'Incident follow-up', scenario: 'Regulator requests proof of corrective actions after a reportable security incident', event: 'Thirty-day remediation evidence submission', controls: 'Incident response plan\nForensic evidence retention\nRoot-cause review\nExecutive remediation approval' },
+];
+
+const evidenceExamples = [
+  { label: 'Access review', documentType: 'Quarterly access review certification', text: 'Review period: Q3 2026. System: Customer Data Platform. Reviewer: Jordan Lee, Control Owner. 47 active accounts reviewed; 3 access removals approved; tickets IAM-2041, IAM-2042, and IAM-2047. Review completed 2026-09-28. Evidence owner confirmed completeness.' },
+  { label: 'Training record', documentType: 'Annual compliance training completion report', text: 'Course: 2026 Privacy and Security Fundamentals. Assigned employees: 186. Completed: 181. Exceptions: 5 employees on approved leave with completion due 2026-10-21. Report approved by the Compliance Director on 2026-10-02.' },
+  { label: 'Change approval', documentType: 'Production change approval record', text: 'Change CHG-8821 updates encryption key rotation from 180 to 90 days. Security review passed 2026-09-14. Testing evidence attached under TEST-441. Approved by Engineering and Compliance. Production deployment window: 2026-09-20 02:00 UTC.' },
+];
+
+const cikExamples = [
+  { label: 'Apple filing feed', cik: '0000320193' },
+  { label: 'Microsoft filing feed', cik: '0000789019' },
+  { label: 'Alphabet filing feed', cik: '0001652044' },
+];
 
 export default function AIBacklogTools() {
   const [tab, setTab] = useState<ToolKey>('cross-mapper');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
   const [result, setResult] = useState<any>(null);
+  const [regulationsList, setRegulationsList] = useState<any[]>([]);
+
+  useEffect(() => {
+    regulations.list({ limit: 100 }).then((response: any) => setRegulationsList(response.data || [])).catch(() => setRegulationsList([]));
+  }, []);
 
   // Cross-mapper
   const [regIds, setRegIds] = useState('');
@@ -63,6 +88,44 @@ export default function AIBacklogTools() {
     }
   };
 
+  const presets: NativePreset[] = tab === 'cross-mapper'
+    ? ['Compare primary pair', 'Compare alternate pair', 'Compare three frameworks'].map((label, index) => ({
+        label,
+        apply: () => {
+          const count = index === 2 ? Math.min(3, regulationsList.length) : 2;
+          const ids = Array.from({ length: count }, (_, offset) => regulationsList[(index + offset) % regulationsList.length].id);
+          setRegIds(ids.join(', '));
+          reset();
+        },
+      }))
+    : tab === 'readiness'
+      ? readinessExamples.map((example, index) => ({
+          label: example.label,
+          apply: () => {
+            setScenario(example.scenario);
+            setEvent(example.event);
+            setReadinessRegId(String(regulationsList[index % regulationsList.length].id));
+            setControlsText(example.controls);
+            reset();
+          },
+        }))
+      : tab === 'evidence'
+        ? evidenceExamples.map((example, index) => ({
+            label: example.label,
+            apply: () => {
+              setExtractedText(example.text);
+              setDocType(example.documentType);
+              setEvidenceRegId(String(regulationsList[index % regulationsList.length].id));
+              reset();
+            },
+          }))
+        : cikExamples.map((example) => ({
+            label: example.label,
+            apply: () => { setCik(example.cik); reset(); },
+          }));
+  const needsRegulations = tab !== 'sec-edgar';
+  const presetsDisabled = busy || (tab === 'cross-mapper' ? regulationsList.length < 2 : needsRegulations && regulationsList.length === 0);
+
   return (
     <div className="container">
       <h1 className="h1">AI Backlog Tools</h1>
@@ -95,6 +158,11 @@ export default function AIBacklogTools() {
 
       <div className="card">
         <form onSubmit={onSubmit} className="col">
+          <NativeAIPresets
+            presets={presets}
+            disabled={presetsDisabled}
+            note={needsRegulations && presetsDisabled && !busy ? 'Examples become available after the required existing regulation records load.' : 'Each example fills every field shown for the selected tool, including optional fields.'}
+          />
           {tab === 'cross-mapper' && (
             <>
               <label className="label">Regulation IDs (comma or whitespace separated, optional - defaults to 5 most recent)</label>
@@ -145,12 +213,12 @@ export default function AIBacklogTools() {
         </form>
       </div>
 
-      {result && (
-        <div className="card">
-          <h2 className="h2">Result</h2>
-          <div className="code" style={{ whiteSpace: 'pre-wrap' }}>{JSON.stringify(result, null, 2)}</div>
-        </div>
-      )}
+      <AIReport response={result} title={`${[
+        ['cross-mapper', 'Cross-regulation mapping'],
+        ['readiness', 'Readiness simulation'],
+        ['evidence', 'Evidence extraction'],
+        ['sec-edgar', 'SEC EDGAR feed'],
+      ].find(([key]) => key === tab)?.[1]} result`} />
     </div>
   );
 }

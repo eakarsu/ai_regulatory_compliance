@@ -1,5 +1,22 @@
 import { useState } from 'react';
+import AIReport from '../components/AIReport';
+import NativeAIPresets from '../components/NativeAIPresets';
 import { ai } from '../services/api';
+
+const examples = [
+  {
+    label: 'EU AI Act example',
+    text: 'Article 9 — Risk management system. A risk management system shall be established, implemented, documented and maintained in relation to high-risk AI systems. It shall be a continuous iterative process planned and run throughout the entire lifecycle of the system, requiring regular systematic review and updating.',
+  },
+  {
+    label: 'GDPR example',
+    text: 'Article 32 — Security of processing. Taking into account the state of the art, implementation costs, and the nature, scope, context and purposes of processing, the controller and processor shall implement appropriate technical and organisational measures to ensure a level of security appropriate to the risk.',
+  },
+  {
+    label: 'Vendor-control example',
+    text: 'The organization must review critical service providers annually, document security and privacy controls, retain approval evidence, assign remediation owners, and notify the compliance lead of material control failures within five business days.',
+  },
+];
 
 export default function AIAnalyzeRegulation() {
   const [text, setText] = useState('');
@@ -30,6 +47,13 @@ export default function AIAnalyzeRegulation() {
       </p>
       <div className="card">
         <form onSubmit={submit} className="col">
+          <NativeAIPresets
+            presets={examples.map((example) => ({
+              label: example.label,
+              apply: () => { setText(example.text); setResult(null); setError(''); },
+            }))}
+            disabled={busy}
+          />
           <label className="label">Regulation Text</label>
           <textarea
             value={text}
@@ -45,86 +69,7 @@ export default function AIAnalyzeRegulation() {
         </form>
       </div>
 
-      {result && (
-        <div className="card">
-          <h2 className="h2">Analysis Result</h2>
-          {result.summary && (
-            <>
-              <h3 className="h3">Summary</h3>
-              <p>{result.summary}</p>
-            </>
-          )}
-          {result.estimated_compliance_effort && (
-            <div className="row" style={{ marginTop: 12 }}>
-              <span
-                className={`badge badge-${
-                  result.estimated_compliance_effort === 'high' ? 'danger' :
-                  result.estimated_compliance_effort === 'medium' ? 'warn' : 'gray'
-                }`}
-              >
-                Effort: {result.estimated_compliance_effort}
-              </span>
-            </div>
-          )}
-          {result.key_requirements && (
-            <>
-              <h3 className="h3">Key Requirements</h3>
-              <ul>
-                {result.key_requirements.map((r: string, i: number) => (
-                  <li key={i}>{r}</li>
-                ))}
-              </ul>
-            </>
-          )}
-          {result.risk_areas && (
-            <>
-              <h3 className="h3">Risk Areas</h3>
-              <ul>
-                {result.risk_areas.map((ra: any, i: number) => (
-                  <li key={i}>
-                    <span
-                      className={`badge badge-${
-                        ra.risk_level === 'critical' ? 'critical' :
-                        ra.risk_level === 'high' ? 'danger' :
-                        ra.risk_level === 'medium' ? 'warn' : 'gray'
-                      }`}
-                    >
-                      {ra.risk_level}
-                    </span>{' '}
-                    <strong>{ra.area}:</strong> {ra.description}
-                  </li>
-                ))}
-              </ul>
-            </>
-          )}
-          {result.compliance_steps && (
-            <>
-              <h3 className="h3">Compliance Steps</h3>
-              <ol>
-                {result.compliance_steps.map((s: string, i: number) => (
-                  <li key={i}>{s}</li>
-                ))}
-              </ol>
-            </>
-          )}
-          {result.affected_business_functions && (
-            <>
-              <h3 className="h3">Affected Business Functions</h3>
-              <p>{result.affected_business_functions.join(', ')}</p>
-            </>
-          )}
-          {result.penalties_for_non_compliance && (
-            <>
-              <h3 className="h3">Penalties</h3>
-              <p>{result.penalties_for_non_compliance}</p>
-            </>
-          )}
-          <details style={{ marginTop: 16 }}>
-            <summary>Raw JSON</summary>
-            <div className="code">{JSON.stringify(result, null, 2)}</div>
-          </details>
-        </div>
-      )}
+      <AIReport response={result} title="Regulation analysis result" />
     </div>
   );
 }
