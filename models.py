@@ -252,6 +252,23 @@ class RegulationWatch(Base):
     regulation = relationship("Regulation", back_populates="watchers")
 
 
+class StaffTask(Base):
+    """Authenticated follow-up tasks owned by a tenant user."""
+    __tablename__ = "staff_tasks"
+
+    id = Column(String, primary_key=True, default=gen_uuid)
+    tenant_id = Column(String, ForeignKey("tenants.id", ondelete="RESTRICT"), nullable=False, index=True)
+    user_id = Column(String, ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
+    title = Column(String, nullable=False)
+    description = Column(Text)
+    priority = Column(String, default="NORMAL", nullable=False)
+    status = Column(String, default="OPEN", nullable=False)
+    due_at = Column(DateTime)
+    completed_at = Column(DateTime)
+    created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False)
+
+
 class ChatMessage(Base):
     """AI compliance chat assistant messages."""
     __tablename__ = "chat_messages"

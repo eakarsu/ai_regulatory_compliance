@@ -73,7 +73,8 @@ export const auth = {
 export const governance = {
   sources: () => request('/governance/sources'),
   ingestSource: (data: any) => request('/governance/sources', { method: 'POST', body: JSON.stringify(data) }),
-  policies: () => request('/governance/policies'),
+  policies: (params: { q?: string; status?: string } = {}) => { const q = new URLSearchParams(); if (params.q) q.set('q', params.q); if (params.status) q.set('status', params.status); return request(`/governance/policies${q.toString() ? '?' + q.toString() : ''}`); },
+  insights: (id: string, kind: string) => request(`/governance/policies/${id}/insights`, { method: 'POST', body: JSON.stringify({ kind }) }),
   policy: (id: string) => request(`/governance/policies/${id}`),
   createPolicy: (data: any) => request('/governance/policies', { method: 'POST', body: JSON.stringify(data) }),
   addEvidence: (id: string, data: any) => request(`/governance/policies/${id}/evidence`, { method: 'POST', body: JSON.stringify(data) }),

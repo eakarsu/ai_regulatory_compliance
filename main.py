@@ -59,6 +59,8 @@ app.add_middleware(CORSMiddleware, allow_origins=[client_url], allow_credentials
 
 app.include_router(auth.router)
 app.include_router(governance_router.router)
+from routers import tasks as tasks_router
+app.include_router(tasks_router.router)
 
 # Historic CRUD, generic AI, generated gaps, and sample integrations do not have
 # the governed tenant/evidence guarantees. They can only be inspected in a

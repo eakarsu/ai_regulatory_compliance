@@ -9,9 +9,13 @@ from pydantic import BaseModel, Field, field_validator
 from sqlalchemy import text
 from sqlalchemy.orm import Session
 
+from fastapi.responses import PlainTextResponse
+
 from auth import get_current_user, require_admin
 from database import get_db
 from governance import evaluate_release, transition, validate_source
+from list_tools import filter_policies, policies_to_csv
+from ai_fallback import INSIGHTS
 from models import User
 
 router = APIRouter(prefix="/api/governance", tags=["governance"])
@@ -139,9 +143,28 @@ def create_policy(payload: PolicyIn, user: User = Depends(get_current_user), db:
 
 
 @router.get("/policies")
-def list_policies(user: User = Depends(get_current_user), db: Session = Depends(get_db)):
+def list_policies(q: str = "", status: str = "", format: str = "json", user: User = Depends(get_current_user), db: Session = Depends(get_db)):
     rows = db.execute(text("SELECT * FROM governed_policy_versions WHERE tenant_id=:tenant ORDER BY created_at DESC"), {"tenant": user.tenant_id}).all()
-    return [as_dict(row) for row in rows]
+    records = filter_policies([as_dict(row) for row in rows], q=q, status=status)
+    # Serialise dates/datetimes for both export formats.
+    records = [{key: (value.isoformat() if hasattr(value, "isoformat") else value) for key, value in record.items()} for record in records]
+    if format.lower() == "csv":
+        return PlainTextResponse(policies_to_csv(records), media_type="text/csv", headers={"Content-Disposition": 'attachment; filename="policies.csv"'})
+    return records
+
+
+class InsightIn(BaseModel):
+    kind: Literal["coverage", "risk", "deadlines"] = "coverage"
+
+
+@router.post("/policies/{policy_id}/insights")
+def policy_insights(policy_id: str, payload: InsightIn, user: User = Depends(get_current_user), db: Session = Depends(get_db)):
+    policy = policy_for(db, policy_id, user.tenant_id)
+    rows = db.execute(text("""SELECT e.*,s.source_uri,s.publisher,s.jurisdiction,s.effective_at,s.content_digest
+        FROM governed_evidence_links e JOIN regulatory_source_versions s ON s.id=e.source_version_id
+        WHERE e.policy_version_id=CAST(:id AS UUID) AND s.tenant_id=:tenant ORDER BY e.deadline"""), {"id": policy_id, "tenant": user.tenant_id}).all()
+    evidence = [{key: (value.isoformat() if hasattr(value, "isoformat") else value) for key, value in as_dict(row).items()} for row in rows]
+    return INSIGHTS[payload.kind](policy, evidence)
 
 
 @router.get("/policies/{policy_id}")
